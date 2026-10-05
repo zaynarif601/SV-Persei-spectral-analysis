@@ -1,10 +1,7 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
 
 
-#RV code
+
+#Radial Velocity Code
 
 
 # In[1]:
@@ -37,9 +34,6 @@ from scipy.interpolate import UnivariateSpline
 from scipy.optimize import curve_fit
 
 
-# =============================================================================
-# HELPER 1 — Convolve synthetic to R=80,000
-# =============================================================================
 
 def convolve_to_resolution(synth_wave, synth_flux, resolution=80000):
     """
@@ -59,9 +53,9 @@ def convolve_to_resolution(synth_wave, synth_flux, resolution=80000):
     return convolve(synth_flux, kernel, boundary='extend')
 
 
-# =============================================================================
-# HELPER 2 — Continuum normalisation
-# =============================================================================
+# =====================================================================
+#   Continuum normalisation
+# =====================================================================
 
 def local_normalise(wave, flux, n_knots=6):
     """
@@ -90,7 +84,7 @@ def local_normalise(wave, flux, n_knots=6):
 
 
 # =============================================================================
-# HELPER 3 — CCF plots in km/s and Angstroms
+#  CCF plots in km/s and Angstroms
 # =============================================================================
 
 def plot_ccf(lags_kms, corr_vals, rv_kms, rv_err_kms, obs_wave,
@@ -215,7 +209,7 @@ def plot_ccf(lags_kms, corr_vals, rv_kms, rv_err_kms, obs_wave,
 
 
 # =============================================================================
-# HELPER 4 — RV cross-correlation with uncertainty
+#           RV cross-correlation with uncertainty
 # =============================================================================
 
 def correct_rv_cross_correlation(obs_wave, obs_flux,
@@ -663,7 +657,7 @@ import matplotlib.pyplot as plt
 get_ipython().run_line_magic('matplotlib', 'qt')
 
 # =============================================================================
-# HELPER 1 — Run MOOG (With Automatic Folder Cleanup)
+#  Run MOOG 
 # =============================================================================
 def run_moog(teff, logg, vmicro, linelist, i):
     rundir = f"./moog_run_{i}"
@@ -688,7 +682,7 @@ def run_moog(teff, logg, vmicro, linelist, i):
     return a
 
 # =============================================================================
-# HELPER 2 — Compute Slopes
+# Compute Slopes
 # =============================================================================
 def compute_slopes(a):
     fe1 = a.abfind_res[26.0]
@@ -715,7 +709,7 @@ def compute_slopes(a):
     return slope_EP, slope_RW, fe_diff, fe1_mean, fe2_mean
 
 # =============================================================================
-# HELPER 3 — Generate 3-Panel Diagnostics Plot
+# Generate 3-Panel Diagnostics Plot
 # =============================================================================
 def plot_final_diagnostics(a_final, condition_name=""):
     fe1 = a_final.abfind_res.get(26.0, pd.DataFrame())
@@ -829,12 +823,12 @@ def optimize_params(teff, logg, vmicro, linelist, max_iter=150):
     return teff, logg, vmicro, ep_list, rw_list, fe_list, teff_list, logg_list, vmicro_list
 
 # =============================================================================
-# SMART LINELIST LOADER
+#       LINELIST LOADER
 # =============================================================================
 def load_and_verify_linelist(filepath):
     print(f"\nLoading linelist from: {filepath}")
     
-    # Let pandas read the file and count the columns automatically
+    
     df = pd.read_csv(filepath, sep=r"\s+", header=None)
     
     if len(df.columns) == 5:
@@ -851,7 +845,7 @@ def load_and_verify_linelist(filepath):
     # Reorder to strict MOOG standard
     df = df[["wavelength", "id", "EP", "loggf", "C6", "D0", "EW"]]
     
-    # Force everything to be numeric (this fixes any hidden NaN or string issues)
+    # Force everything to be numeric 
     df = df.apply(pd.to_numeric, errors='coerce').dropna()
     
     print(f"Successfully loaded {len(df)} lines.")
@@ -872,10 +866,10 @@ if __name__ == "__main__":
 
     # 2. Define conditions
     test_conditions = [
-         #{"max_ew": 200, "min_ep": 2.0, "max_ep": 6.0},
+          {"max_ew": 200, "min_ep": 2.0, "max_ep": 6.0},
           {"max_ew": 200, "min_ep": 2.5, "max_ep": 6.0},
-         #{"max_ew": 150, "min_ep": 2.0, "max_ep": 6.0},
-         #{"max_ew": 150, "min_ep": 2.5, "max_ep": 6.0}
+          {"max_ew": 150, "min_ep": 2.0, "max_ep": 6.0},
+          {"max_ew": 150, "min_ep": 2.5, "max_ep": 6.0}
     ]
 
     print("\nStarting Robustness Tests for SV Persei...\n")
@@ -946,179 +940,7 @@ if __name__ == "__main__":
 #Synthetic spectra code
 
 
-# In[5]:
-
-
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-import pymoog
-get_ipython().run_line_magic('matplotlib', 'qt')
-
-observed_data = np.loadtxt("/home/zaynarif/Downloads/HRS/svper_target_order_rv_corr.txt")
-
-# Add this right after you load the new file
-print(f"Order 1 ranges from {observed_data[0, 0]:.1f} Å to {observed_data[-1, 0]:.1f} Å")
-
-def spectral_synthesis(teff, logg, new_mh, v_turb, observed_data):
-
-    # Define synthesis region
-    start_wav = 6001.5
-    end_wav = 6222.7
-
-    # Generate synthetic spectrum
-    synth_data = pymoog.synth.synth(
-        teff,
-        logg,
-        0,
-        start_wav,
-        end_wav,
-        80000,
-        vmicro=v_turb,
-        line_list='kurucz'
-    )
-
-    synth_data.prepare_file(
-        model_format='kurucz',
-        model_type='kurucz',
-        abun_change={26: new_mh},
-        smooth_para=['m', 0, 0, 0, 20, 0]
-    )
-
-    synth_data.run_moog(output=True)
-    synth_data.read_spectra()
-
-    # Load Fe linelist
-    linelist = pd.read_csv(
-        "Downloads/ARES/moog_region1_cleaned.txt",
-        sep=r"\s+",
-        header=None,
-        names=["wavelength","id","EP","loggf","EW"]
-    )
-    linelist["id"] = linelist["id"].round(1)
-    linelist["C6"] = 0.0
-    linelist["D0"] = 0.0
-    linelist = linelist[["wavelength","id","EP","loggf","C6","D0","EW"]]
-    linelist = linelist.sort_values(by=["id","wavelength"])
-
-    print(linelist.head())
-
-    # Select lines in synthesis region
-    plot_lines_df = linelist[
-        (linelist["wavelength"] >= start_wav) &
-        (linelist["wavelength"] <= end_wav)
-    ]
-
-    # Map element IDs
-    element_map = {
-        26.0: "Fe I",
-        26.1: "Fe II"
-    }
-
-    labeled_lines_df = plot_lines_df[
-        plot_lines_df["id"].isin(element_map.keys())
-    ]
-
-# Mask observed spectrum to match region
-    mask = (observed_data[:,0] >= start_wav) & (observed_data[:,0] <= end_wav)
-
-    # --- NEW: Local Continuum Correction ---
-    # Find the 95th percentile of the flux in this specific window to represent the continuum
-    local_continuum = np.percentile(observed_data[:,1][mask], 95)
-    
-    # Scale the observed flux up so the continuum sits at 1.0
-    corrected_obs_flux = observed_data[:,1][mask] / local_continuum
-    # ---------------------------------------
-
-    # ----------- PLOT -----------
-
-    fig, ax1 = plt.subplots(figsize=(10,6))
-
-    # Observed spectrum
-    ax1.plot(
-        observed_data[:,0][mask],
-        corrected_obs_flux,  # <-- Use the scaled flux here
-        color="black",
-        label="Observed spectrum"
-    )
-
-    # Synthetic spectrum
-    ax1.plot(
-        synth_data.wav,
-        synth_data.flux,
-        "--",
-        color="red",
-        label="Synthetic spectrum"
-    )
-
-    ax1.set_ylabel("Normalized Flux")
-    ax1.set_xlabel("Wavelength (Å)")
-    ax1.set_ylim(0, 1.4)
-    ax1.set_xlim(start_wav, end_wav)
-
-    ax1.legend(loc="upper right")
-
-    # Plot Fe line markers
-# Plot Fe line markers
-    for _, row in labeled_lines_df.iterrows():
-        wav = row["wavelength"]
-        element_id = row["id"]
-        element_label = element_map[element_id]
-
-        # Assign colors: Red for neutral (Fe I), Blue for ionized (Fe II)
-        line_color = "red" if element_id == 26.0 else "blue"
-
-        # Vertical line
-        ax1.axvline(
-            wav,
-            color=line_color,
-            linestyle="--", # Changed to dashed for better visibility
-            alpha=0.5,
-            lw=2.0
-        )
-
-        # Text label
-        ax1.text(
-            wav,
-            1.08, # Moved slightly higher to avoid clipping
-            element_label,
-            rotation=90,
-            color=line_color,
-            fontsize=8,
-            ha="center",
-            va="bottom"
-        )
-
-    # Stellar parameter text
-    param_text = (
-        f"Teff = {teff:.0f} K\n"
-        f"log g = {logg:.2f}\n"
-        f"[Fe/H] = {new_mh:.2f}\n"
-        f"$v_t$ = {v_turb:.2f} km/s"
-    )
-
-    ax1.text(
-        0.02,
-        0.02,
-        param_text,
-        transform=ax1.transAxes,
-        fontsize=12,
-        verticalalignment="bottom",
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7)
-    )
-
-    plt.title("Observed vs Synthetic Spectrum")
-    plt.tight_layout()
-    plt.show()
-
-
-# In[6]:
-
-
-spectral_synthesis(5055, 0.66, -0.10, 2.89, observed_data)
-
-
-# In[13]:
+# In[]:
 
 
 import numpy as np
