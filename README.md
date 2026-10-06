@@ -14,3 +14,4 @@ Applied to **SV Persei** using CFHT/ESPaDOnS data (R ≈ 80,000).
 - log g = 0.66 ± 0.03 dex
 - ξ_t   = 2.89 ± 0.12 km/s
 - [Fe/H] = −0.107 ± 0.04 dex
+- V_broad = 15.18 ± 0.04 km/s
